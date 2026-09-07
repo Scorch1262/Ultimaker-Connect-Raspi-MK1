@@ -1,0 +1,22 @@
+[Unit]
+Description=Ultimaker Connect Raspi - USB-zu-Netzwerk-Bruecke fuer den Ultimaker 2+
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# __INSTALL_DIR__ und __RUN_USER__ werden von install.sh automatisch
+# durch den tatsaechlichen Installationspfad/Benutzer ersetzt.
+Type=simple
+User=__RUN_USER__
+WorkingDirectory=__INSTALL_DIR__
+ExecStart=__INSTALL_DIR__/venv/bin/python3 __INSTALL_DIR__/app.py
+Restart=on-failure
+RestartSec=5
+# Port 80 erfordert entweder Root (siehe User= oben) oder die in
+# install.sh gesetzte CAP_NET_BIND_SERVICE-Capability auf den venv-
+# Python-Interpreter, falls stattdessen ein normaler Benutzer genutzt
+# werden soll.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
