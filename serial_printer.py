@@ -173,13 +173,20 @@ class UltimakerPrinter:
 
     def _handshake(self):
         """Fragt die Firmware-Version ab (M115) - rein informativ fuer
-        /api/v1/system."""
-        try:
-            resp = self._send_raw("M115", wait_ok=True, timeout=10)
-            m = re.search(r"FIRMWARE_NAME:([^\s]+(?:\s[^\s]+)*?)\s+(?:SOURCE|PROTOCOL|EXTRUDER|MACHINE)", resp)
-            self.firmware = m.group(1) if m else (resp.strip()[:60] or "unbekannt")
-        except Exception:
-            self.firmware = "unbekannt"
+        /api/v1/system. Mehrere Versuche, da manche Firmwares nach dem
+        Neustart noch ein, zwei Sekunden brauchen, bis sie zuverlaessig
+        antworten."""
+        for attempt in range(3):
+            try:
+                resp = self._send_raw("M115", wait_ok=True, timeout=10)
+                m = re.search(r"FIRMWARE_NAME:([^\s]+(?:\s[^\s]+)*?)\s+(?:SOURCE|PROTOCOL|EXTRUDER|MACHINE)", resp)
+                self.firmware = m.group(1) if m else (resp.strip()[:60] or "unbekannt")
+                return
+            except TimeoutError:
+                time.sleep(1.5)
+            except Exception:
+                break
+        self.firmware = "unbekannt"
 
     # Anzahl aufeinanderfolgender M105-Zeitueberschreitungen, bevor die
     # Verbindung wirklich als verloren gilt (statt bei jeder einzelnen
@@ -227,6 +234,20 @@ class UltimakerPrinter:
     # ------------------------------------------------------------------
     # Low-Level serielle Kommunikation
     # ------------------------------------------------------------------
+    def _drain_stale_input(self):
+        """Verwirft Daten, die noch unverarbeitet im Empfangspuffer
+        liegen - typischerweise die verspaetete Antwort auf einen
+        vorherigen, per Zeitueberschreitung abgebrochenen Befehl (z. B.
+        ein Homing, das laenger gedauert hat als wir gewartet haben).
+        Wird VOR jedem neuen Befehl aufgerufen, damit eine solche
+        verspaetete Antwort nicht faelschlich als Bestaetigung des
+        naechsten, eigentlich neuen Befehls gelesen wird."""
+        try:
+            if self._ser and self._ser.in_waiting:
+                self._ser.reset_input_buffer()
+        except Exception:
+            pass
+
     def _send_raw(self, line: str, wait_ok: bool = True, timeout: float = LINE_TIMEOUT_SEC) -> str:
         """Sendet eine einzelne Zeile OHNE Zeilennummer/Checksumme (fuer
         Setup-/Steuerbefehle wie M104, M140, M117, G28, M105). Gibt die
@@ -234,6 +255,7 @@ class UltimakerPrinter:
         with self._io_lock:
             if not self._ser:
                 raise SerialException("Serieller Port nicht offen")
+            self._drain_stale_input()
             self._ser.write((line + "\n").encode("ascii", errors="replace"))
             self._ser.flush()
             if not wait_ok:
@@ -284,6 +306,7 @@ class UltimakerPrinter:
         cs = self._checksum(body + " ")
         full = f"{body} *{cs}"
         with self._io_lock:
+            self._drain_stale_input()
             for attempt in range(5):
                 self._ser.write((full + "\n").encode("ascii", errors="replace"))
                 self._ser.flush()
@@ -317,10 +340,14 @@ class UltimakerPrinter:
         safe = text.replace("\n", " ")[:40]
         self._send_raw(f"M117 {safe}")
 
+    # Homing kann - je nach Ausgangsposition der Achsen - deutlich
+    # laenger dauern als ein normaler Steuerbefehl.
+    HOME_TIMEOUT_SEC = 90
+
     def home(self):
         if self.job is not None:
             raise RuntimeError("Homing waehrend eines Druckjobs nicht moeglich")
-        self._send_raw("G28")
+        self._send_raw("G28", timeout=self.HOME_TIMEOUT_SEC)
 
     # ------------------------------------------------------------------
     # Druckjob-Steuerung

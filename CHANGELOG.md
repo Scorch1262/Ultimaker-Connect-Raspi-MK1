@@ -4,6 +4,22 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.1.2] - Bugfix: Homing-Timeout & Befehls-Desync
+
+- **Fix:** Homing (`G28`) hatte nur 30 Sekunden Zeit für eine Antwort -
+  zu knapp, da das Anfahren aller Achsen je nach Ausgangsposition
+  deutlich länger dauern kann. Zeitlimit auf 90 Sekunden angehoben.
+- **Fix (wichtiger):** Wenn ein Befehl in eine Zeitüberschreitung lief
+  (weil die Firmware noch mit der vorherigen, länger dauernden Aktion
+  beschäftigt war), konnte deren verspätet eintreffende Bestätigung
+  fälschlich als Antwort auf den *nächsten* Befehl gelesen werden -
+  der eigentlich neue Befehl wurde dann still ignoriert, ohne dass ein
+  Fehler auftrat ("Home" schien beim zweiten Versuch nichts mehr zu
+  tun). Vor jedem gesendeten Befehl werden jetzt eventuell noch im
+  Puffer liegende, verspätete Altantworten verworfen.
+- Der Verbindungsaufbau (`M115`-Firmware-Abfrage) versucht es jetzt bis
+  zu dreimal, bevor die Firmware als "unbekannt" markiert wird.
+
 ## [0.1.1] - Bugfix: instabile serielle Verbindung
 
 - **Fix:** Eine einzelne verspätete Antwort auf die Temperaturabfrage
