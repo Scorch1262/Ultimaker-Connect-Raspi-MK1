@@ -151,6 +151,14 @@ ZIP) sowie einer aktualisierten README, sofern sich am Verhalten etwas
   einer einfachen Hochrechnung aus bisherigem Fortschritt und
   verstrichener Zeit – zu Beginn eines Drucks ungenau, wird mit
   fortschreitendem Druck genauer.
+- **Gelegentliche Verbindungsaussetzer:** Seit Version 0.1.1 werden
+  einzelne verspätete Antworten toleriert (erst nach 3 aufeinander-
+  folgenden Fehlversuchen wird die Verbindung neu aufgebaut). Treten
+  „Verbindung verloren"-Meldungen trotzdem regelmäßig auf, deutet das
+  meist auf ein instabiles USB-Kabel oder eine unzureichende
+  Stromversorgung des Pi hin - insbesondere auf älteren Modellen wie
+  dem Pi 1B lohnt sich ein kurzes, gutes USB-Kabel und ein Netzteil mit
+  stabilen 5 V.
 - **mDNS kann im Netzwerk blockiert sein** (VLANs, manche
   Firmen-/Schulnetze) – das manuelle Hinzufügen per IP-Adresse in Cura
   funktioniert davon unabhängig immer.

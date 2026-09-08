@@ -4,6 +4,19 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.1.1] - Bugfix: instabile serielle Verbindung
+
+- **Fix:** Eine einzelne verspätete Antwort auf die Temperaturabfrage
+  (`M105`) führte bisher sofort zu einem kompletten Neuaufbau der
+  seriellen Verbindung - was bei Arduino-basierten Boards wie dem UM2+
+  einen Firmware-Reset auslöst (DTR-Signal). Auf langsamerer Hardware
+  (z. B. Raspberry Pi 1B) äußerte sich das als ständige
+  "Verbindung verloren"-Meldungen und dauerhaft unbekannte Firmware.
+  Reine Zeitüberschreitungen werden jetzt von echten Geräte-/Kabel-
+  Fehlern unterschieden und erst nach mehreren (3) aufeinanderfolgenden
+  Fehlversuchen als tatsächlicher Verbindungsabbruch gewertet.
+- Zeitlimit für die Temperaturabfrage von 5 auf 8 Sekunden angehoben.
+
 ## [0.1.0] - Erste Version
 
 - Serielle USB/G-Code-Kommunikation mit dem Ultimaker 2+

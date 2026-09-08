@@ -181,15 +181,43 @@ class UltimakerPrinter:
         except Exception:
             self.firmware = "unbekannt"
 
+    # Anzahl aufeinanderfolgender M105-Zeitueberschreitungen, bevor die
+    # Verbindung wirklich als verloren gilt (statt bei jeder einzelnen
+    # verspaeteten Antwort einen kompletten - firmwareresettenden -
+    # Neuverbindungsversuch auszuloesen).
+    MAX_CONSECUTIVE_TIMEOUTS = 3
+
     def _monitor_loop(self, port: str):
         """Laeuft, solange die Verbindung steht. Pollt Temperaturen, wenn
         gerade kein Druckjob laeuft (waehrend des Drucks macht das der
         Druck-Thread selbst nebenbei)."""
+        consecutive_timeouts = 0
         while not self._stop and self.connected:
             if self.job is None or self.job.state in (JOB_PAUSED,):
                 try:
                     self._poll_temperature()
+                    consecutive_timeouts = 0
+                except TimeoutError:
+                    # Reine Protokoll-Zeitueberschreitung (Firmware hat
+                    # diesmal nicht rechtzeitig geantwortet) - das
+                    # physische Kabel/Geraet ist deswegen nicht zwingend
+                    # weg. Einzelne Aussetzer tolerieren, statt die
+                    # Verbindung (und damit per DTR-Reset die Firmware!)
+                    # jedes Mal komplett neu aufzubauen.
+                    consecutive_timeouts += 1
+                    self.error_message = None
+                    if consecutive_timeouts >= self.MAX_CONSECUTIVE_TIMEOUTS:
+                        self.connected = False
+                        self.status = STATUS_ERROR
+                        self.error_message = (
+                            f"Verbindung zu {port} verloren "
+                            f"({consecutive_timeouts}x keine Antwort in Folge)."
+                        )
+                        return
                 except (SerialException, OSError):
+                    # Echter Geraete-/E-A-Fehler (z. B. USB-Kabel wurde
+                    # getrennt) - hier ist ein Neuverbindungsversuch
+                    # richtig.
                     self.connected = False
                     self.status = STATUS_ERROR
                     self.error_message = f"Verbindung zu {port} verloren."
@@ -220,7 +248,12 @@ class UltimakerPrinter:
                 self._maybe_update_temps(raw)
                 if raw.lower().startswith("ok"):
                     return "".join(buf)
-            raise SerialException(f"Zeitueberschreitung, keine Antwort auf: {line}")
+            # Bewusst ein eigener Exception-Typ (statt SerialException):
+            # eine reine Protokoll-Zeitueberschreitung ist etwas anderes
+            # als ein tatsaechlicher Geraete-/E-A-Fehler und wird von den
+            # Aufrufern (siehe _monitor_loop) auch unterschiedlich
+            # behandelt.
+            raise TimeoutError(f"Zeitueberschreitung, keine Antwort auf: {line}")
 
     def _maybe_update_temps(self, raw_line: str):
         m = TEMP_RE.search(raw_line)
@@ -233,7 +266,7 @@ class UltimakerPrinter:
             self.bed_target = float(m.group("bed_t"))
 
     def _poll_temperature(self):
-        self._send_raw("M105", wait_ok=True, timeout=5)
+        self._send_raw("M105", wait_ok=True, timeout=8)
 
     @staticmethod
     def _checksum(data: str) -> int:
