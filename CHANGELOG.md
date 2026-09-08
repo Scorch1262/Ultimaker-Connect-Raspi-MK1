@@ -4,6 +4,18 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.1.3] - Bugfix: falsche Standard-Baudrate
+
+- **Fix:** Die Standard-Baudrate war auf 115200 gesetzt. Die offizielle
+  Ultimaker2Marlin-Firmware (Standard auf dem UM2+) kommuniziert aber
+  standardmäßig mit 250000 Baud - das führte dazu, dass jede Anfrage
+  (inkl. Homing) unbeantwortet blieb bzw. nur Zeichensalat empfangen
+  wurde, ohne dass sich der Drucker überhaupt bewegte. Standardwert in
+  `config.json` und im Code auf 250000 korrigiert.
+- README um einen Abschnitt zum direkten Verbindungstest per
+  `miniterm` (unabhängig von diesem Projekt) sowie einen Hinweis zur
+  Baudrate ergänzt.
+
 ## [0.1.2] - Bugfix: Homing-Timeout & Befehls-Desync
 
 - **Fix:** Homing (`G28`) hatte nur 30 Sekunden Zeit für eine Antwort -

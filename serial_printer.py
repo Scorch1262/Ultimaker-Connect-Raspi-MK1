@@ -97,7 +97,7 @@ class UltimakerPrinter:
     """Haelt die serielle Verbindung zum Ultimaker 2+ und den kompletten
     Zustand (Temperaturen, Status, laufender Druckjob)."""
 
-    BAUDRATE_DEFAULT = 115200
+    BAUDRATE_DEFAULT = 250000
     TEMP_POLL_INTERVAL_SEC = 3.0
     LINE_TIMEOUT_SEC = 30
 

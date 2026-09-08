@@ -89,9 +89,35 @@ ls -l /dev/serial/by-id/
 ```json
 "serial": {
     "port": "/dev/serial/by-id/usb-Ultimaker...-if00",
-    "baudrate": 115200
+    "baudrate": 250000
 }
 ```
+
+### Baudrate
+
+Die offizielle Ultimaker2Marlin-Firmware (Standard auf dem UM2+)
+kommuniziert standardmäßig mit **250000 Baud**, nicht mit den bei
+anderen Marlin-Druckern üblichen 115200 – deshalb ist das auch der
+Standardwert in `config.json`. Falls auf dem eigenen Drucker eine
+angepasste Firmware mit 115200 Baud läuft, hier entsprechend anpassen.
+Symptom einer falschen Baudrate: nur Zeichensalat statt lesbarem Text
+bei einem direkten Verbindungstest (siehe nächster Abschnitt).
+
+### Direkter Verbindungstest (Fehlersuche)
+
+Um die serielle Verbindung unabhängig von diesem Projekt zu testen -
+z. B. um eine falsche Baudrate von einem echten Verkabelungsproblem zu
+unterscheiden - Dienst kurz stoppen und direkt draufschauen:
+
+```bash
+sudo systemctl stop ultimaker-connect-raspi
+source venv/bin/activate
+python3 -m serial.tools.miniterm /dev/ttyACM0 250000
+```
+
+Dort `G28` eintippen und Enter drücken: bei korrekter Baudrate
+erscheint lesbarer Text (u. a. `ok`) und die Achsen fahren. Mit
+`Strg+]` beenden, `deactivate`, danach den Dienst wieder starten.
 
 Nach Änderungen an `config.json` den Dienst neu starten:
 `sudo systemctl restart ultimaker-connect-raspi`.

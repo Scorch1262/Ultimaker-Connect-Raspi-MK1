@@ -24,7 +24,7 @@ Konfiguration:             config.json (liegt im selben Ordner)
 #   PATCH  Bugfix / kleine Korrektur ohne Verhaltensaenderung
 #   MINOR  Neues Feature, abwaertskompatibel
 #   MAJOR  Breaking Change (z. B. config.json-Format aendert sich)
-APP_VERSION = "0.1.2"
+APP_VERSION = "0.1.3"
 
 import json
 import os
@@ -58,7 +58,7 @@ DEFAULT_CONFIG = {
         # /dev/ttyUSB*). Fuer produktiven Betrieb empfiehlt sich ein
         # fester Pfad ueber /dev/serial/by-id/... (siehe README).
         "port": None,
-        "baudrate": 115200
+        "baudrate": 250000
     },
     "network": {
         "printer_name": "Ultimaker 2+ (Raspberry Pi)",
@@ -95,7 +95,7 @@ cfg = load_config()
 
 printer = UltimakerPrinter(
     port=cfg["serial"].get("port") or None,
-    baudrate=cfg["serial"].get("baudrate", 115200),
+    baudrate=cfg["serial"].get("baudrate", 250000),
 )
 printer.start()
 
