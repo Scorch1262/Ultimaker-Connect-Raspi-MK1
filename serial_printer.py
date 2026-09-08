@@ -297,20 +297,44 @@ class UltimakerPrinter:
             cs ^= ch
         return cs
 
+    # Zeitlimits fuer das Zeilen-Streaming waehrend eines Druckjobs.
+    # Normale Bewegungsbefehle bekommen mehr Luft als frueher (die
+    # Firmware kann "ok" etwas verzoegert senden, wenn ihr interner
+    # Bewegungspuffer voll ist). Explizite "warte, bis Zieltemperatur
+    # erreicht"-Befehle (M109/M190/M191) duerfen von der Firmware ganz
+    # bewusst mehrere Minuten lang unbeantwortet bleiben - das ist kein
+    # Fehler, sondern genau ihr Zweck.
+    DEFAULT_STREAM_TIMEOUT_SEC = 60
+    LONG_WAIT_STREAM_TIMEOUT_SEC = 600
+    LONG_WAIT_COMMANDS = ("M109", "M190", "M191")
+
+    def _stream_timeout_for(self, gcode: str) -> float:
+        first_word = gcode.strip().split(maxsplit=1)[0].upper() if gcode.strip() else ""
+        if first_word in self.LONG_WAIT_COMMANDS:
+            return self.LONG_WAIT_STREAM_TIMEOUT_SEC
+        return self.DEFAULT_STREAM_TIMEOUT_SEC
+
     def _send_numbered_line(self, gcode: str) -> None:
         """Sendet eine Zeile im Marlin-Streaming-Protokoll mit
-        Zeilennummer + Checksumme, inkl. einfachem Resend-Handling - so
-        wie es Cura selbst beim USB-Druck macht."""
+        Zeilennummer + Checksumme. Bei einer expliziten 'Resend: N'-
+        Anfrage der Firmware wird dieselbe Zeile erneut gesendet - das
+        ist Teil des Standardprotokolls. Bei reinem Ausbleiben einer
+        Antwort wird dagegen NICHT blind erneut gesendet (das koennte
+        bei relativen Bewegungen/Extrusion zu doppelt ausgefuehrten
+        Befehlen fuehren), sondern ein Fehler gemeldet - der Druck wird
+        dann kontrolliert abgebrochen statt undefiniert weiterzulaufen."""
         self._line_no += 1
         body = f"N{self._line_no} {gcode}"
         cs = self._checksum(body + " ")
         full = f"{body} *{cs}"
+        timeout = self._stream_timeout_for(gcode)
         with self._io_lock:
             self._drain_stale_input()
-            for attempt in range(5):
+            for resend_attempt in range(3):
                 self._ser.write((full + "\n").encode("ascii", errors="replace"))
                 self._ser.flush()
-                deadline = time.time() + self.LINE_TIMEOUT_SEC
+                deadline = time.time() + timeout
+                got_resend = False
                 while time.time() < deadline:
                     raw = self._ser.readline().decode("ascii", errors="replace")
                     if not raw:
@@ -318,12 +342,16 @@ class UltimakerPrinter:
                     self._maybe_update_temps(raw)
                     if raw.lower().startswith("ok"):
                         return
-                    if raw.lower().startswith("resend") or raw.lower().startswith("rs"):
-                        # Firmware verlangt erneutes Senden derselben Zeile.
+                    if raw.lower().startswith(("resend", "rs")):
+                        got_resend = True
                         break
-                else:
-                    raise SerialException("Zeitueberschreitung beim Zeilen-Streaming")
-            raise SerialException(f"Zeile {self._line_no} auch nach mehreren Versuchen nicht bestaetigt")
+                if got_resend:
+                    continue  # dieselbe Zeile erneut senden
+                raise TimeoutError(
+                    f"Zeitueberschreitung bei Zeile {self._line_no} "
+                    f"({gcode[:24]!r}, Zeitlimit {timeout:.0f}s)"
+                )
+            raise SerialException(f"Zeile {self._line_no} auch nach mehreren Resend-Anfragen nicht bestaetigt")
 
     # ------------------------------------------------------------------
     # Steuerbefehle (auch fuer die API nutzbar)

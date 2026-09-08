@@ -4,6 +4,26 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.1.4] - Bugfix: Druckabbruch durch Zeilen-Timeout
+
+- **Fix (Logikfehler):** Die "5 Versuche"-Wiederholung beim Senden
+  einer G-Code-Zeile griff durch eine fehlerhafte
+  `while`/`else`-Konstruktion in der Praxis nie - eine einzige zu
+  langsame Antwort brach den gesamten Druck sofort ab
+  ("Zeitueberschreitung beim Zeilen-Streaming").
+- **Fix:** Aufheiz-Befehle mit Wartezeit (`M109`/`M190`/`M191`) dürfen
+  von der Firmware bewusst mehrere Minuten lang unbeantwortet bleiben,
+  bis die Zieltemperatur erreicht ist - das ist kein Fehler. Diese
+  Befehle bekommen jetzt ein eigenes, deutlich längeres Zeitlimit
+  (10 Minuten) statt des bisherigen pauschalen 30-Sekunden-Limits für
+  alle Zeilen. Normale Bewegungsbefehle bekommen ebenfalls mehr Luft
+  (60 statt 30 Sekunden).
+- Ein echtes erneutes Senden derselben Zeile passiert jetzt nur noch
+  bei einer expliziten `Resend:`-Anfrage der Firmware (Teil des
+  Standardprotokolls) - nicht mehr bei einem reinen, unklaren
+  Ausbleiben einer Antwort, da das bei relativen Bewegungen/Extrusion
+  zu doppelt ausgeführten Befehlen führen könnte.
+
 ## [0.1.3] - Bugfix: falsche Standard-Baudrate
 
 - **Fix:** Die Standard-Baudrate war auf 115200 gesetzt. Die offizielle
