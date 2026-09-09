@@ -4,6 +4,17 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.2.2] - Bugfix: Solltemperatur-Anzeige nach Druckende
+
+- **Fix:** Nach einem normal beendeten oder abgebrochenen Druck wurde
+  `M104 S0`/`M140 S0` zwar an die Firmware gesendet, die intern
+  gemerkten Solltemperaturen (und damit die Dashboard-Anzeige) aber
+  nicht mit auf 0 zurückgesetzt.
+- Das Abschalten der Heizungen nach Druckende/-abbruch/-fehler läuft
+  jetzt über eine gemeinsame, robuste Methode: schlägt der Befehl
+  selbst fehl, wird das nur geloggt, statt einen ansonsten
+  erfolgreichen Druck nachträglich als "Fehler" erscheinen zu lassen.
+
 ## [0.2.1] - Der eigentliche Fund: Firmware hängt sich bei `;`-Kommentaren auf
 
 - **Fix (Ursache endlich gefunden):** Per gezieltem Diagnose-Skript

@@ -494,8 +494,7 @@ class UltimakerPrinter:
                     self.job.lines_sent += 1
 
             if self._abort_event.is_set():
-                self._send_raw("M104 S0")
-                self._send_raw("M140 S0")
+                self._cooldown_heaters()
                 self._send_raw("M107")
                 if self.job:
                     self.job.state = JOB_NONE
@@ -503,8 +502,7 @@ class UltimakerPrinter:
                 self.job = None
                 self.status = STATUS_IDLE
             else:
-                self._send_raw("M104 S0")
-                self._send_raw("M140 S0")
+                self._cooldown_heaters()
                 if self.job:
                     self.job.state = JOB_POST_PRINT
                     self.job.finished_at = time.time()
@@ -526,20 +524,25 @@ class UltimakerPrinter:
                 self.job.state = JOB_NONE
             self.job = None
 
-    def _safety_heaters_off(self):
-        """Best-effort Versuch, Duesen- und Betttemperatur abzuschalten,
-        wenn ein Druck mit einem echten Fehler abbricht - eine
-        unbeaufsichtigt weiter heizende Duese waere sonst ein Sicherheits-
-        risiko. Ein Fehlschlag hier wird bewusst nur geloggt, nicht erneut
-        geworfen, damit die eigentliche urspruengliche Fehlermeldung nicht
-        verdeckt wird."""
+    def _cooldown_heaters(self, context: str = "nach Druckende"):
+        """Best-effort Versuch, Duesen- und Betttemperatur abzuschalten.
+        Wird sowohl nach einem normal beendeten/abgebrochenen Druck als
+        auch nach einem echten Fehler aufgerufen. Ein Fehlschlag hier
+        wird bewusst nur geloggt statt erneut geworfen: bei einem an
+        sich erfolgreichen Druck soll ein misslungener Abschalt-Befehl
+        nicht den ganzen Druck nachtraeglich als 'Fehler' erscheinen
+        lassen, und bei einem bereits fehlgeschlagenen Druck soll die
+        urspruengliche Fehlermeldung nicht verdeckt werden."""
         try:
             self._send_raw("M104 S0", timeout=10)
             self.hotend_target = 0.0
             self._send_raw("M140 S0", timeout=10)
             self.bed_target = 0.0
         except Exception as exc:  # noqa: BLE001
-            print(f"[ultimaker-connect-raspi] Konnte Heizungen nach Fehler nicht abschalten: {exc}", flush=True)
+            print(f"[ultimaker-connect-raspi] Konnte Heizungen {context} nicht abschalten: {exc}", flush=True)
+
+    def _safety_heaters_off(self):
+        self._cooldown_heaters(context="nach Fehler")
 
     def pause_print(self):
         if not self.job or self.job.state not in (JOB_PRINTING,):
