@@ -303,6 +303,68 @@ class UltimakerPrinter:
     def _poll_temperature(self):
         self._send_raw("M105", wait_ok=True, timeout=8)
 
+    # Zuordnung "blockierender" Aufheiz-Befehl -> nicht-blockierendes
+    # Aequivalent + zugehoeriger Temperatursensor. Wird genutzt, um
+    # M109/M190/M191 NIE direkt an die Firmware zu schicken (siehe
+    # _wait_for_temperature).
+    NON_BLOCKING_HEAT_EQUIVALENT = {
+        "M109": ("M104", "hotend"),
+        "M190": ("M140", "bed"),
+        "M191": ("M141", "bed"),
+    }
+    TEMPERATURE_WAIT_TIMEOUT_SEC = 600
+    TEMPERATURE_TOLERANCE_C = 1.0
+
+    def _wait_for_temperature(self, sensor: str, target: float):
+        """Wartet aktiv per M105-Polling, bis eine Zieltemperatur
+        erreicht ist - OHNE dabei ein blockierendes M109/M190/M191 an
+        die Firmware zu senden. Hintergrund: bei dieser (sehr alten,
+        angepassten) Firmware fuehrt das firmwareseitige Warten
+        offenbar zu einem Haenger (Display bleibt danach leer, keine
+        weiteren Befehle werden mehr beantwortet). Das Warten hier vom
+        Pi aus zu uebernehmen umgeht diesen Codepfad in der Firmware
+        komplett und nutzt stattdessen denselben M105-Mechanismus, der
+        bereits nachweislich zuverlaessig funktioniert."""
+        deadline = time.time() + self.TEMPERATURE_WAIT_TIMEOUT_SEC
+        while time.time() < deadline:
+            if self._abort_event.is_set():
+                return
+            self._send_raw("M105", wait_ok=True, timeout=10)
+            current = self.hotend_current if sensor == "hotend" else self.bed_current
+            if current >= target - self.TEMPERATURE_TOLERANCE_C:
+                return
+            time.sleep(2)
+        raise TimeoutError(
+            f"Zieltemperatur {target:.0f}C ({sensor}) nicht innerhalb "
+            f"{self.TEMPERATURE_WAIT_TIMEOUT_SEC:.0f}s erreicht."
+        )
+
+    def _send_heat_and_wait_line(self, gcode: str) -> bool:
+        """Erkennt M109/M190/M191-Zeilen und behandelt sie ueber das
+        nicht-blockierende Aequivalent + eigenes Warten (siehe
+        _wait_for_temperature) statt sie direkt zu senden. Gibt True
+        zurueck, wenn die Zeile so behandelt wurde (Aufrufer muss sie
+        dann NICHT zusaetzlich ueber _send_print_line schicken)."""
+        first_word = gcode.strip().split(maxsplit=1)[0].upper() if gcode.strip() else ""
+        mapping = self.NON_BLOCKING_HEAT_EQUIVALENT.get(first_word)
+        if not mapping:
+            return False
+        non_blocking_cmd, sensor = mapping
+        s_match = re.search(r"[Ss](-?\d+\.?\d*)", gcode)
+        if not s_match:
+            # Kein Temperaturziel angegeben (z. B. reines "M109" ohne
+            # S-Wert) - dann gibt es auch nichts zu warten, einfach als
+            # normale Zeile behandeln.
+            return False
+        target = float(s_match.group(1))
+        self._send_raw(f"{non_blocking_cmd} S{target:.1f}", timeout=10)
+        if sensor == "hotend":
+            self.hotend_target = target
+        else:
+            self.bed_target = target
+        self._wait_for_temperature(sensor, target)
+        return True
+
     # Zeitlimits fuer das Zeilen-Streaming waehrend eines Druckjobs.
     # Normale Bewegungsbefehle bekommen mehr Luft als frueher (die
     # Firmware kann "ok" etwas verzoegert senden, wenn ihr interner
@@ -415,15 +477,9 @@ class UltimakerPrinter:
                 # (paused/resuming) drucken wir jetzt wieder aktiv.
                 if self.job and self.job.state != JOB_PRINTING:
                     self.job.state = JOB_PRINTING
-                is_long_wait = self._stream_timeout_for(gcode) >= self.LONG_WAIT_STREAM_TIMEOUT_SEC
-                self._send_print_line(gcode)
-                if is_long_wait:
-                    # Manche aelteren/einfacheren Marlin-Varianten (wie
-                    # diese von 2018) reagieren direkt nach einem langen
-                    # Aufheiz-Warten (M109/M190) kurzzeitig nicht
-                    # zuverlaessig auf den naechsten Befehl. Eine kurze
-                    # Verschnaufpause hat sich hier als wirksam erwiesen.
-                    time.sleep(1.0)
+                handled = self._send_heat_and_wait_line(gcode)
+                if not handled:
+                    self._send_print_line(gcode)
                 if self.job:
                     self.job.lines_sent += 1
 

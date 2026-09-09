@@ -4,6 +4,20 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.2.0] - M109/M190/M191 werden nicht mehr direkt an die Firmware gesendet
+
+- **Fix (grundlegend):** Aufheiz-Befehle mit eingebautem Warten
+  (`M109`/`M190`/`M191`) führten bei dieser Firmware zuverlässig dazu,
+  dass die nächste Zeile (z. B. das harmlose `G21`) keine Antwort mehr
+  bekam. Die kurze Pause aus 0.1.9 hat das Problem nicht gelöst. Diese
+  Befehle werden jetzt nie mehr direkt an die Firmware geschickt:
+  stattdessen wird das nicht-blockierende Äquivalent (`M104`/`M140`)
+  gesendet und die Ziel-Temperatur per eigenem `M105`-Polling vom Pi
+  aus abgewartet - derselbe, bereits nachweislich zuverlässige
+  Mechanismus, den auch das Live-Dashboard nutzt.
+- Damit ist dieses Projekt nicht mehr auf ein firmwareseitig
+  funktionierendes `M109`/`M190` angewiesen.
+
 ## [0.1.9] - Bugfix: Zeile direkt nach Aufheiz-Warten blieb unbeantwortet
 
 - **Fix:** Die Zeile direkt nach einem langen Aufheiz-Warten
