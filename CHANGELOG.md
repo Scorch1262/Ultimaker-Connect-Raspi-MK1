@@ -4,6 +4,20 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.1.5] - Bugfix: Fehlermeldung nach Druckabbruch verschwand sofort wieder
+
+- **Fix:** Nach einem fehlgeschlagenen Druckjob blieb der Status zwar
+  auf "error" stehen, die eigentliche, hilfreiche Fehlermeldung wurde
+  aber vom Temperatur-Polling im Hintergrund sofort wieder auf `null`
+  gesetzt (Nebeneffekt des 0.1.1-Fixes) - im Dashboard war dann nur
+  noch "error" ohne jede Erklärung zu sehen.
+- Echte Fehler (Druckfehler, Verbindungsverlust) werden jetzt zusätzlich
+  über `journalctl -u ultimaker-connect-raspi` sichtbar geloggt, statt
+  nur intern im Status zu verschwinden.
+- Der Fehlerzustand im Dashboard normalisiert sich jetzt automatisch
+  zurück auf "idle", sobald der Drucker wieder nachweislich zuverlässig
+  antwortet, statt dauerhaft auf "error" hängen zu bleiben.
+
 ## [0.1.4] - Bugfix: Druckabbruch durch Zeilen-Timeout
 
 - **Fix (Logikfehler):** Die "5 Versuche"-Wiederholung beim Senden

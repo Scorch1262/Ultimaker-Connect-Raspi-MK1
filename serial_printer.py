@@ -169,6 +169,7 @@ class UltimakerPrinter:
                 self.connected = False
                 self.status = STATUS_ERROR
                 self.error_message = f"Verbindung zu {port} verloren/fehlgeschlagen: {exc}"
+                print(f"[ultimaker-connect-raspi] {self.error_message}", flush=True)
                 time.sleep(5)
 
     def _handshake(self):
@@ -204,15 +205,26 @@ class UltimakerPrinter:
                 try:
                     self._poll_temperature()
                     consecutive_timeouts = 0
+                    if self.status == STATUS_ERROR:
+                        # Drucker antwortet wieder zuverlaessig (z. B.
+                        # nach einem beendeten/fehlgeschlagenen
+                        # Druckjob) - Fehlerzustand im Dashboard nicht
+                        # unbegrenzt haengen lassen.
+                        self.status = STATUS_IDLE
+                        self.error_message = None
                 except TimeoutError:
                     # Reine Protokoll-Zeitueberschreitung (Firmware hat
                     # diesmal nicht rechtzeitig geantwortet) - das
                     # physische Kabel/Geraet ist deswegen nicht zwingend
                     # weg. Einzelne Aussetzer tolerieren, statt die
                     # Verbindung (und damit per DTR-Reset die Firmware!)
-                    # jedes Mal komplett neu aufzubauen.
+                    # jedes Mal komplett neu aufzubauen. WICHTIG: hier
+                    # bewusst NICHT self.error_message loeschen - das
+                    # wuerde sonst faelschlich auch eine noch aktuelle,
+                    # unabhaengige Fehlermeldung (z. B. von einem zuvor
+                    # fehlgeschlagenen Druckjob) im Dashboard verstecken,
+                    # obwohl der Status weiterhin "error" bleibt.
                     consecutive_timeouts += 1
-                    self.error_message = None
                     if consecutive_timeouts >= self.MAX_CONSECUTIVE_TIMEOUTS:
                         self.connected = False
                         self.status = STATUS_ERROR
@@ -220,14 +232,16 @@ class UltimakerPrinter:
                             f"Verbindung zu {port} verloren "
                             f"({consecutive_timeouts}x keine Antwort in Folge)."
                         )
+                        print(f"[ultimaker-connect-raspi] {self.error_message}", flush=True)
                         return
-                except (SerialException, OSError):
+                except (SerialException, OSError) as exc:
                     # Echter Geraete-/E-A-Fehler (z. B. USB-Kabel wurde
                     # getrennt) - hier ist ein Neuverbindungsversuch
                     # richtig.
                     self.connected = False
                     self.status = STATUS_ERROR
                     self.error_message = f"Verbindung zu {port} verloren."
+                    print(f"[ultimaker-connect-raspi] {self.error_message} ({exc})", flush=True)
                     return
             time.sleep(self.TEMP_POLL_INTERVAL_SEC)
 
@@ -442,12 +456,14 @@ class UltimakerPrinter:
         except (SerialException, OSError) as exc:
             self.status = STATUS_ERROR
             self.error_message = f"Fehler waehrend des Drucks: {exc}"
+            print(f"[ultimaker-connect-raspi] Druckfehler: {self.error_message}", flush=True)
             if self.job:
                 self.job.state = JOB_NONE
             self.job = None
         except Exception as exc:  # noqa: BLE001 - Druckjob darf Thread nie stillschweigend killen
             self.status = STATUS_ERROR
             self.error_message = f"Unerwarteter Fehler waehrend des Drucks: {exc}"
+            print(f"[ultimaker-connect-raspi] Unerwarteter Druckfehler: {self.error_message}", flush=True)
             if self.job:
                 self.job.state = JOB_NONE
             self.job = None
