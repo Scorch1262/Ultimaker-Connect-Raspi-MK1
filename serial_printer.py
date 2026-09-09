@@ -330,42 +330,49 @@ class UltimakerPrinter:
 
     def _send_numbered_line(self, gcode: str) -> None:
         """Sendet eine Zeile im Marlin-Streaming-Protokoll mit
-        Zeilennummer + Checksumme. Bei einer expliziten 'Resend: N'-
-        Anfrage der Firmware wird dieselbe Zeile erneut gesendet - das
-        ist Teil des Standardprotokolls. Bei reinem Ausbleiben einer
-        Antwort wird dagegen NICHT blind erneut gesendet (das koennte
-        bei relativen Bewegungen/Extrusion zu doppelt ausgefuehrten
-        Befehlen fuehren), sondern ein Fehler gemeldet - der Druck wird
-        dann kontrolliert abgebrochen statt undefiniert weiterzulaufen."""
+        Zeilennummer + Checksumme. Wird innerhalb des Zeitlimits weder
+        'ok' noch eine verwertbare Antwort empfangen (egal ob durch
+        Stille - z. B. ein einzelnes verlorenes Byte auf der seriellen
+        Leitung - oder eine explizite 'Resend'-Anfrage), wird DIESELBE
+        Zeilennummer erneut gesendet. Das ist bei diesem nummerierten
+        Protokoll sicher: Marlin verwirft eine bereits erfolgreich
+        verarbeitete Zeilennummer beim erneuten Empfang automatisch
+        (bestaetigt sie nur mit 'ok'), statt sie ein zweites Mal
+        auszufuehren - anders als bei den einfachen, unnummerierten
+        Befehlen ueber _send_raw."""
         self._line_no += 1
         body = f"N{self._line_no} {gcode}"
         cs = self._checksum(body + " ")
         full = f"{body} *{cs}"
         timeout = self._stream_timeout_for(gcode)
+        # Aufheiz-Befehle mit Wartezeit haben schon ein sehr grosszuegiges
+        # Zeitlimit fuer sich allein - hier zusaetzlich mehrfach zu
+        # wiederholen wuerde im Fehlerfall nur unnoetig lange dauern.
+        max_attempts = 1 if timeout >= self.LONG_WAIT_STREAM_TIMEOUT_SEC else 3
         with self._io_lock:
             self._drain_stale_input()
-            for resend_attempt in range(3):
+            for attempt in range(1, max_attempts + 1):
                 self._ser.write((full + "\n").encode("ascii", errors="replace"))
                 self._ser.flush()
                 deadline = time.time() + timeout
-                got_resend = False
+                confirmed = False
                 while time.time() < deadline:
                     raw = self._ser.readline().decode("ascii", errors="replace")
                     if not raw:
                         continue
                     self._maybe_update_temps(raw)
                     if raw.lower().startswith("ok"):
-                        return
-                    if raw.lower().startswith(("resend", "rs")):
-                        got_resend = True
+                        confirmed = True
                         break
-                if got_resend:
-                    continue  # dieselbe Zeile erneut senden
-                raise TimeoutError(
-                    f"Zeitueberschreitung bei Zeile {self._line_no} "
-                    f"({gcode[:24]!r}, Zeitlimit {timeout:.0f}s)"
-                )
-            raise SerialException(f"Zeile {self._line_no} auch nach mehreren Resend-Anfragen nicht bestaetigt")
+                    if raw.lower().startswith(("resend", "rs")):
+                        break  # sofort erneut senden, statt das Zeitfenster abzuwarten
+                if confirmed:
+                    return
+            raise TimeoutError(
+                f"Keine Bestaetigung fuer Zeile {self._line_no} "
+                f"({gcode[:24]!r}) nach {max_attempts} Versuch(en) "
+                f"a {timeout:.0f}s."
+            )
 
     # ------------------------------------------------------------------
     # Steuerbefehle (auch fuer die API nutzbar)

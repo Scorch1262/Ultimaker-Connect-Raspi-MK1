@@ -4,6 +4,20 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.1.6] - Bugfix: Druckabbruch bei einzelner verlorener Zeile
+
+- **Fix (Designfehler):** Blieb beim Streamen einer G-Code-Zeile die
+  Antwort komplett aus (z. B. durch ein einzelnes verlorenes Byte auf
+  der seriellen Leitung - auf einem Pi 1B keine Seltenheit), wurde der
+  Druck sofort komplett abgebrochen, selbst bei völlig unauffälligen
+  Befehlen wie `G21`. Die bisherige Vorsicht ("kein blindes erneutes
+  Senden wegen möglicher doppelter Ausführung") war für das hier
+  verwendete nummerierte Zeilen-Protokoll unnötig streng: Marlin
+  verwirft eine bereits verarbeitete Zeilennummer beim erneuten Empfang
+  automatisch, statt sie doppelt auszuführen. Eine Zeile wird jetzt bei
+  Stille genauso wie bei einer expliziten `Resend`-Anfrage bis zu
+  dreimal erneut gesendet, bevor der Druck abgebrochen wird.
+
 ## [0.1.5] - Bugfix: Fehlermeldung nach Druckabbruch verschwand sofort wieder
 
 - **Fix:** Nach einem fehlgeschlagenen Druckjob blieb der Status zwar
