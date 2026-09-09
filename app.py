@@ -24,7 +24,7 @@ Konfiguration:             config.json (liegt im selben Ordner)
 #   PATCH  Bugfix / kleine Korrektur ohne Verhaltensaenderung
 #   MINOR  Neues Feature, abwaertskompatibel
 #   MAJOR  Breaking Change (z. B. config.json-Format aendert sich)
-APP_VERSION = "0.1.7"
+APP_VERSION = "0.1.8"
 
 import json
 import os

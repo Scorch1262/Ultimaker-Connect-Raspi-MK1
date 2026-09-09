@@ -4,6 +4,16 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.1.8] - Sicherheitsfix: Heizung blieb nach Druckfehler an
+
+- **Fix (Sicherheit):** Bei einem sauberen Druckende oder einem
+  Abbruch wurden Düse und Bett abgeschaltet - bei einem echten *Fehler*
+  während des Drucks bisher nicht. Die Düse konnte dadurch nach einem
+  fehlgeschlagenen Druck unbeaufsichtigt beheizt bleiben. Jetzt wird in
+  jedem Fehlerfall ebenfalls versucht, beide Heizungen abzuschalten
+  (best-effort, wird protokolliert statt die eigentliche Fehlermeldung
+  zu verdecken).
+
 ## [0.1.7] - Bugfix: Drucken funktionierte nie (Prüfsummen-Protokoll)
 
 - **Fix (grundlegend):** Das nummerierte Marlin-Streaming-Protokoll mit

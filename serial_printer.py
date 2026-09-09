@@ -439,6 +439,7 @@ class UltimakerPrinter:
             self.status = STATUS_ERROR
             self.error_message = f"Fehler waehrend des Drucks: {exc}"
             print(f"[ultimaker-connect-raspi] Druckfehler: {self.error_message}", flush=True)
+            self._safety_heaters_off()
             if self.job:
                 self.job.state = JOB_NONE
             self.job = None
@@ -446,9 +447,25 @@ class UltimakerPrinter:
             self.status = STATUS_ERROR
             self.error_message = f"Unerwarteter Fehler waehrend des Drucks: {exc}"
             print(f"[ultimaker-connect-raspi] Unerwarteter Druckfehler: {self.error_message}", flush=True)
+            self._safety_heaters_off()
             if self.job:
                 self.job.state = JOB_NONE
             self.job = None
+
+    def _safety_heaters_off(self):
+        """Best-effort Versuch, Duesen- und Betttemperatur abzuschalten,
+        wenn ein Druck mit einem echten Fehler abbricht - eine
+        unbeaufsichtigt weiter heizende Duese waere sonst ein Sicherheits-
+        risiko. Ein Fehlschlag hier wird bewusst nur geloggt, nicht erneut
+        geworfen, damit die eigentliche urspruengliche Fehlermeldung nicht
+        verdeckt wird."""
+        try:
+            self._send_raw("M104 S0", timeout=10)
+            self.hotend_target = 0.0
+            self._send_raw("M140 S0", timeout=10)
+            self.bed_target = 0.0
+        except Exception as exc:  # noqa: BLE001
+            print(f"[ultimaker-connect-raspi] Konnte Heizungen nach Fehler nicht abschalten: {exc}", flush=True)
 
     def pause_print(self):
         if not self.job or self.job.state not in (JOB_PRINTING,):
