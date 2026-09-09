@@ -200,7 +200,15 @@ class UltimakerPrinter:
         Druck-Thread selbst nebenbei)."""
         consecutive_timeouts = 0
         while not self._stop and self.connected:
-            if self.job is None or self.job.state in (JOB_PAUSED,):
+            # Poll immer, ausser der Druck-Thread ist gerade selbst aktiv
+            # am Senden (PRINTING/PAUSING/RESUMING/ABORTING) - dort wuerde
+            # das Polling nur unnoetig um die serielle Verbindung
+            # konkurrieren. In allen anderen Zustaenden - auch waehrend
+            # der Wartezeit nach Druckende (POST_PRINT/WAIT_CLEANUP), bevor
+            # der Job manuell entfernt wurde - soll die Temperaturanzeige
+            # weiter aktuell bleiben statt einzufrieren.
+            active_print_states = (JOB_PRINTING, JOB_PAUSING, JOB_RESUMING, JOB_ABORTING)
+            if self.job is None or self.job.state not in active_print_states:
                 try:
                     self._poll_temperature()
                     consecutive_timeouts = 0

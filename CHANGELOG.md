@@ -4,6 +4,18 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.2.3] - Bugfix: Temperaturanzeige fror nach Druckende ein
+
+- **Fix:** Das Temperatur-Polling im Hintergrund pausierte nicht nur
+  während eines aktiven Drucks (richtig so), sondern auch während der
+  gesamten Wartezeit *nach* Druckende, bis der Job manuell über "Job
+  entfernen" bestätigt wurde. Die Düse kühlte in Wirklichkeit ganz
+  normal ab, das Dashboard zeigte aber weiter den letzten Messwert vor
+  Druckbeginn eingefroren an - solange, bis "Job entfernen" geklickt
+  wurde und plötzlich ein Sprung auf den (dann bereits deutlich
+  abgekühlten) echten Wert erschien. Polling läuft jetzt auch während
+  dieser Wartezeit normal weiter.
+
 ## [0.2.2] - Bugfix: Solltemperatur-Anzeige nach Druckende
 
 - **Fix:** Nach einem normal beendeten oder abgebrochenen Druck wurde
