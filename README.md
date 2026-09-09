@@ -30,9 +30,12 @@ Der Pi übersetzt in beide Richtungen:
   inklusive automatischer Erkennung per mDNS/Zeroconf
   (`_ultimaker._tcp.local.`).
 - **Richtung USB:** spricht mit dem UM2+ das native G-Code-Protokoll
-  seiner Marlin-basierten Firmware (Zeilennummerierung + Prüfsumme,
-  Temperatur-Polling per `M105`) – genau das Protokoll, das auch Cura
-  selbst beim direkten USB-Druck verwendet.
+  seiner Marlin-basierten Firmware (einfache Klartext-Zeilen mit
+  `ok`-Bestätigung, Temperatur-Polling per `M105`). Ursprünglich kam
+  hier - wie bei Cura's eigenem USB-Druck - ein nummeriertes Protokoll
+  mit Prüfsumme zum Einsatz; das hat sich an echter Hardware aber als
+  nicht funktionsfähig erwiesen (siehe Changelog 0.1.7) und wurde
+  durch das einfache Klartext-Verfahren mit eigenem Retry ersetzt.
 
 ## Projektstruktur
 

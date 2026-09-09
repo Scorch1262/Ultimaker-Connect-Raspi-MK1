@@ -123,7 +123,6 @@ class UltimakerPrinter:
         self._pause_event = threading.Event()
         self._abort_event = threading.Event()
         self._print_thread: Optional[threading.Thread] = None
-        self._line_no = 0
 
     # ------------------------------------------------------------------
     # Verbindung
@@ -304,13 +303,6 @@ class UltimakerPrinter:
     def _poll_temperature(self):
         self._send_raw("M105", wait_ok=True, timeout=8)
 
-    @staticmethod
-    def _checksum(data: str) -> int:
-        cs = 0
-        for ch in data.encode("ascii", errors="replace"):
-            cs ^= ch
-        return cs
-
     # Zeitlimits fuer das Zeilen-Streaming waehrend eines Druckjobs.
     # Normale Bewegungsbefehle bekommen mehr Luft als frueher (die
     # Firmware kann "ok" etwas verzoegert senden, wenn ihr interner
@@ -328,51 +320,37 @@ class UltimakerPrinter:
             return self.LONG_WAIT_STREAM_TIMEOUT_SEC
         return self.DEFAULT_STREAM_TIMEOUT_SEC
 
-    def _send_numbered_line(self, gcode: str) -> None:
-        """Sendet eine Zeile im Marlin-Streaming-Protokoll mit
-        Zeilennummer + Checksumme. Wird innerhalb des Zeitlimits weder
-        'ok' noch eine verwertbare Antwort empfangen (egal ob durch
-        Stille - z. B. ein einzelnes verlorenes Byte auf der seriellen
-        Leitung - oder eine explizite 'Resend'-Anfrage), wird DIESELBE
-        Zeilennummer erneut gesendet. Das ist bei diesem nummerierten
-        Protokoll sicher: Marlin verwirft eine bereits erfolgreich
-        verarbeitete Zeilennummer beim erneuten Empfang automatisch
-        (bestaetigt sie nur mit 'ok'), statt sie ein zweites Mal
-        auszufuehren - anders als bei den einfachen, unnummerierten
-        Befehlen ueber _send_raw."""
-        self._line_no += 1
-        body = f"N{self._line_no} {gcode}"
-        cs = self._checksum(body + " ")
-        full = f"{body} *{cs}"
+    def _send_print_line(self, gcode: str) -> None:
+        """Sendet eine Zeile waehrend eines Druckjobs.
+
+        Urspruenglich wurde hier (wie bei Cura's eigenem USB-Druck) das
+        nummerierte Marlin-Protokoll mit Pruefsumme verwendet. An
+        echter Ultimaker-2+-Hardware hat sich das aber als nicht
+        funktionsfaehig erwiesen: selbst triviale Befehle wie 'G21'
+        blieben dauerhaft OHNE jede Antwort - auch ohne 'Resend'-
+        Anfrage -, waehrend einfache, unnummerierte Befehle (M115,
+        M105, G28) an genau derselben Firmware zuverlaessig
+        funktionieren. Vermutlich erwartet diese Firmware-Variante
+        ("Sprinter/grbl mashup for gen6") eine andere
+        Pruefsummen-Berechnung. Deshalb wird hier bewusst auf
+        Zeilennummer/Pruefsumme verzichtet und stattdessen dasselbe
+        einfache Verfahren wie bei den Steuerbefehlen genutzt - dafuer
+        mit eigenem Retry bei Stille, da ohne Zeilennummer kein
+        eingebautes Resend-Sicherheitsnetz existiert."""
         timeout = self._stream_timeout_for(gcode)
-        # Aufheiz-Befehle mit Wartezeit haben schon ein sehr grosszuegiges
-        # Zeitlimit fuer sich allein - hier zusaetzlich mehrfach zu
-        # wiederholen wuerde im Fehlerfall nur unnoetig lange dauern.
         max_attempts = 1 if timeout >= self.LONG_WAIT_STREAM_TIMEOUT_SEC else 3
-        with self._io_lock:
-            self._drain_stale_input()
-            for attempt in range(1, max_attempts + 1):
-                self._ser.write((full + "\n").encode("ascii", errors="replace"))
-                self._ser.flush()
-                deadline = time.time() + timeout
-                confirmed = False
-                while time.time() < deadline:
-                    raw = self._ser.readline().decode("ascii", errors="replace")
-                    if not raw:
-                        continue
-                    self._maybe_update_temps(raw)
-                    if raw.lower().startswith("ok"):
-                        confirmed = True
-                        break
-                    if raw.lower().startswith(("resend", "rs")):
-                        break  # sofort erneut senden, statt das Zeitfenster abzuwarten
-                if confirmed:
-                    return
-            raise TimeoutError(
-                f"Keine Bestaetigung fuer Zeile {self._line_no} "
-                f"({gcode[:24]!r}) nach {max_attempts} Versuch(en) "
-                f"a {timeout:.0f}s."
-            )
+        last_exc: Exception | None = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                self._send_raw(gcode, wait_ok=True, timeout=timeout)
+                return
+            except TimeoutError as exc:
+                last_exc = exc
+                continue
+        raise TimeoutError(
+            f"Keine Bestaetigung fuer {gcode[:24]!r} nach "
+            f"{max_attempts} Versuch(en) a {timeout:.0f}s."
+        ) from last_exc
 
     # ------------------------------------------------------------------
     # Steuerbefehle (auch fuer die API nutzbar)
@@ -423,9 +401,6 @@ class UltimakerPrinter:
 
     def _print_worker(self, lines: list[str]):
         try:
-            with self._io_lock:
-                self._line_no = 0
-                self._send_raw("M110 N0")
             for gcode in lines:
                 # Auf Pause warten (busy-wait mit kurzer Sleep, damit
                 # resume/abort zeitnah greifen).
@@ -440,7 +415,7 @@ class UltimakerPrinter:
                 # (paused/resuming) drucken wir jetzt wieder aktiv.
                 if self.job and self.job.state != JOB_PRINTING:
                     self.job.state = JOB_PRINTING
-                self._send_numbered_line(gcode)
+                self._send_print_line(gcode)
                 if self.job:
                     self.job.lines_sent += 1
 

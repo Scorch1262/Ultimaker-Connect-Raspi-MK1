@@ -4,6 +4,20 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.1.7] - Bugfix: Drucken funktionierte nie (Prüfsummen-Protokoll)
+
+- **Fix (grundlegend):** Das nummerierte Marlin-Streaming-Protokoll mit
+  Prüfsumme (`N<nr> <gcode> *<checksum>`) hat an echter Hardware nie
+  funktioniert - selbst triviale Befehle wie `G21` blieben dauerhaft
+  ohne jede Antwort, auch ohne `Resend`-Anfrage, während einfache
+  Klartext-Befehle (M115, M105, G28) an genau derselben Firmware
+  (`Sprinter/grbl mashup for gen6`) zuverlässig funktionieren.
+  G-Code-Zeilen werden beim Drucken jetzt genauso wie Steuerbefehle als
+  einfache Klartext-Zeilen ohne Zeilennummer/Prüfsumme gesendet, mit
+  eigenem Retry (bis zu 3 Versuche) bei Stille.
+- Damit entfällt auch das eingebaute Resend-Sicherheitsnetz der
+  Zeilennummerierung - unkritisch, da es ohnehin nie genutzt wurde.
+
 ## [0.1.6] - Bugfix: Druckabbruch bei einzelner verlorener Zeile
 
 - **Fix (Designfehler):** Blieb beim Streamen einer G-Code-Zeile die
