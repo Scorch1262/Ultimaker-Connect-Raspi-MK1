@@ -447,8 +447,18 @@ class UltimakerPrinter:
         if not self.connected:
             raise RuntimeError("Drucker ist nicht verbunden")
 
-        lines = [ln.strip() for ln in gcode_text.splitlines()]
-        lines = [ln for ln in lines if ln and not ln.startswith(";")]
+        # Kommentare (';' und alles danach) IMMER entfernen, bevor eine
+        # Zeile an den Drucker geht - nicht nur reine Kommentarzeilen.
+        # Grund: diese Firmware haengt sich bei jeder Zeile mit einem
+        # angehaengten Kommentar komplett auf (per Diagnose bestaetigt),
+        # und Kommentare sind ohnehin nur fuer Menschen gedacht.
+        raw_lines = [ln.strip() for ln in gcode_text.splitlines()]
+        lines = []
+        for ln in raw_lines:
+            if ";" in ln:
+                ln = ln.split(";", 1)[0].strip()
+            if ln:
+                lines.append(ln)
         if not lines:
             raise RuntimeError("G-Code-Datei enthaelt keine ausfuehrbaren Zeilen")
 

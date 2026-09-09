@@ -4,6 +4,20 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.2.1] - Der eigentliche Fund: Firmware hängt sich bei `;`-Kommentaren auf
+
+- **Fix (Ursache endlich gefunden):** Per gezieltem Diagnose-Skript
+  bestätigt: Diese Firmware hängt sich bei JEDER Zeile mit einem
+  Semikolon-Kommentar komplett auf - unabhängig von Inhalt, Leerzeichen
+  oder Position - und bleibt danach für die *gesamte restliche Sitzung*
+  unempfänglich für weitere Befehle, auch für an sich harmlose wie
+  `G90`. `G21` allein (ohne Kommentar) funktionierte dagegen schon die
+  ganze Zeit einwandfrei. Alle vorherigen Fixes (0.1.4-0.2.0) haben an
+  Symptomen herumgedoktert, ohne die eigentliche Ursache zu treffen.
+  Kommentare (`;` und alles danach) werden jetzt aus JEDER Zeile
+  entfernt, bevor sie an den Drucker geht - nicht mehr nur aus reinen
+  Kommentarzeilen.
+
 ## [0.2.0] - M109/M190/M191 werden nicht mehr direkt an die Firmware gesendet
 
 - **Fix (grundlegend):** Aufheiz-Befehle mit eingebautem Warten
