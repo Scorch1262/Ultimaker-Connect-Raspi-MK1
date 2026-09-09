@@ -415,7 +415,15 @@ class UltimakerPrinter:
                 # (paused/resuming) drucken wir jetzt wieder aktiv.
                 if self.job and self.job.state != JOB_PRINTING:
                     self.job.state = JOB_PRINTING
+                is_long_wait = self._stream_timeout_for(gcode) >= self.LONG_WAIT_STREAM_TIMEOUT_SEC
                 self._send_print_line(gcode)
+                if is_long_wait:
+                    # Manche aelteren/einfacheren Marlin-Varianten (wie
+                    # diese von 2018) reagieren direkt nach einem langen
+                    # Aufheiz-Warten (M109/M190) kurzzeitig nicht
+                    # zuverlaessig auf den naechsten Befehl. Eine kurze
+                    # Verschnaufpause hat sich hier als wirksam erwiesen.
+                    time.sleep(1.0)
                 if self.job:
                     self.job.lines_sent += 1
 

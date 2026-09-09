@@ -4,6 +4,19 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.1.9] - Bugfix: Zeile direkt nach Aufheiz-Warten blieb unbeantwortet
+
+- **Fix:** Die Zeile direkt nach einem langen Aufheiz-Warten
+  (`M109`/`M190`/`M191`) - z. B. `G21` gleich nach `M109 S210` -
+  bekam trotz eines an sich funktionierenden, trivialen Befehls
+  dauerhaft keine Antwort. Manuell per `miniterm` funktionierte
+  derselbe Befehl isoliert einwandfrei; das deutet auf ältere/
+  einfachere Marlin-Firmware (hier: `Marlin 1.0.0`, Baujahr 2018) hin,
+  die direkt nach dem Aufheiz-Warten kurzzeitig nicht zuverlässig auf
+  den nächsten Befehl reagiert. Nach einem `M109`/`M190`/`M191` wird
+  jetzt eine kurze Pause (1 Sekunde) eingelegt, bevor die nächste Zeile
+  gesendet wird.
+
 ## [0.1.8] - Sicherheitsfix: Heizung blieb nach Druckfehler an
 
 - **Fix (Sicherheit):** Bei einem sauberen Druckende oder einem
