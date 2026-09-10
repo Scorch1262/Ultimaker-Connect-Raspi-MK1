@@ -24,7 +24,7 @@ Konfiguration:             config.json (liegt im selben Ordner)
 #   PATCH  Bugfix / kleine Korrektur ohne Verhaltensaenderung
 #   MINOR  Neues Feature, abwaertskompatibel
 #   MAJOR  Breaking Change (z. B. config.json-Format aendert sich)
-APP_VERSION = "0.2.3"
+APP_VERSION = "0.3.0"
 
 import json
 import os
@@ -410,7 +410,6 @@ INDEX_HTML = r"""
           <button class="btn-mini" id="btnResume" onclick="control('resume')">Fortsetzen</button>
           <button class="btn-mini danger" id="btnAbort" onclick="control('abort')">Abbrechen</button>
           <button class="btn-mini" id="btnHome" onclick="control('home')">Homing</button>
-          <button class="btn-mini" id="btnClear" onclick="control('clear_job')">Job entfernen</button>
         </div>
         <div class="field-label" style="margin-top:18px;">Hinweis</div>
         <div class="hint-text" style="font-size:11.5px; color:var(--text-dim); line-height:1.5;">
@@ -496,7 +495,6 @@ async function refresh(){
     document.getElementById('btnResume').disabled = !hasJob || !['paused','pausing'].includes(jobState);
     document.getElementById('btnAbort').disabled = !hasJob;
     document.getElementById('btnHome').disabled = hasJob || !s.connected;
-    document.getElementById('btnClear').disabled = !hasJob || !['post_print','wait_cleanup'].includes(jobState);
   } catch(e){
     // Naechster Poll-Zyklus versucht es erneut.
   }

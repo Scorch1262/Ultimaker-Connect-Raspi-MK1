@@ -4,6 +4,16 @@ Alle nennenswerten Änderungen an "Ultimaker Connect Raspi" werden hier
 festgehalten. Versionsnummern folgen der semantischen Versionierung
 (MAJOR.MINOR.PATCH), siehe `APP_VERSION` in `app.py`.
 
+## [0.3.0] - Druckjob wird nach Abschluss automatisch entfernt
+
+- **Neu:** Ein Druckjob wird nach erfolgreichem Abschluss jetzt
+  automatisch entfernt, statt im Zustand "post_print" auf einen
+  manuellen Klick auf "Job entfernen" zu warten. Der nächste Druck
+  kann dadurch sofort gestartet werden.
+- Den dadurch überflüssig gewordenen "Job entfernen"-Button aus dem
+  Dashboard entfernt (die zugehörige Aktion bleibt im Hintergrund
+  bestehen, falls sie noch woanders genutzt wird).
+
 ## [0.2.3] - Bugfix: Temperaturanzeige fror nach Druckende ein
 
 - **Fix:** Das Temperatur-Polling im Hintergrund pausierte nicht nur

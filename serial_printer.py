@@ -512,8 +512,11 @@ class UltimakerPrinter:
             else:
                 self._cooldown_heaters()
                 if self.job:
-                    self.job.state = JOB_POST_PRINT
                     self.job.finished_at = time.time()
+                # Job wird nach erfolgreichem Druckende automatisch
+                # entfernt, statt auf "Job entfernen" zu warten - so
+                # kann der naechste Druck sofort gestartet werden.
+                self.job = None
                 self.status = STATUS_IDLE
         except (SerialException, OSError) as exc:
             self.status = STATUS_ERROR
